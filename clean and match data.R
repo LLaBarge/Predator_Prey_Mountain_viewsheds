@@ -1,7 +1,5 @@
 
 library(ggplot2)
-remove.packages("rlang")
-install.packages("rlang")
 
 # Ensure New_Timestamp is POSIXct
 matching_data$New_Timestamp <- as.POSIXct(matching_data$New_Timestamp, 
@@ -30,8 +28,8 @@ p1 <- ggplot(matching_data, aes(x = longitude, y = latitude, color = species)) +
   labs(title = "Movement Trajectories by Species",
        x = "Longitude", y = "Latitude", color = "Species") +
   coord_fixed(ratio = 1)
-p1
-ggsave("movement_analysis/trajectories_all.png", p1, width = 10, height = 8, dpi = 300)
+
+ggsave("trajectories_all.png", p1, width = 10, height = 8, dpi = 300)
 
 # Baboon trajectories only
 p2 <- ggplot(baboon_data, aes(x = longitude, y = latitude)) +
@@ -42,7 +40,7 @@ p2 <- ggplot(baboon_data, aes(x = longitude, y = latitude)) +
        x = "Longitude", y = "Latitude") +
   coord_fixed(ratio = 1)
 
-ggsave("movement_analysis/trajectories_baboon.png", p2, width = 10, height = 8, dpi = 300)
+ggsave("trajectories_baboon.png", p2, width = 10, height = 8, dpi = 300)
 
 # Vervet trajectories only
 p3 <- ggplot(vervet_data, aes(x = longitude, y = latitude)) +
@@ -55,7 +53,6 @@ p3 <- ggplot(vervet_data, aes(x = longitude, y = latitude)) +
 p3
 ggsave("movement_analysis/trajectories_vervet.png", p3, width = 10, height = 8, dpi = 300)
 
-cat("Trajectory plots saved\n\n")
 
 # filter unrealistic movement
 
@@ -105,7 +102,7 @@ filter_by_speed <- function(data, species_name, max_speed_kmh = 5) {
            subtitle = paste("Red line: threshold =", max_speed_kmh, "km/h"),
            x = "Speed (km/h)", y = "Count")
     
-    ggsave(paste0("movement_analysis/speed_distribution_", tolower(species_name), ".png"), 
+    ggsave(paste0("speed_distribution_", tolower(species_name), ".png"), 
            p, width = 8, height = 6, dpi = 300)
   }
   
