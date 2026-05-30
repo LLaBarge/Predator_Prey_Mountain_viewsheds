@@ -4,20 +4,20 @@ library(dplyr)
 
 # --- Model coefficients (from INLA output) -----------------------------------
 betas <- list(
-  dist          = 1.686,
-  clearance     = 0.834,
-  vis           = -0.127,
-  dist_x_clear  = 5.578,
-  dist_x_vis  = 0.080
+  dist          = 0.273,
+  clearance     = 0.599,
+  vis           =  -0.121,
+  dist_x_clear  = 0.689,
+  dist_x_vis  = 0.055
 )
 
 # 95% CIs
 cis <- list(
-  dist          = c(1.210,   2.163),
-  clearance     = c( 0.629,   1.039),
-  vis           = c(-0.174,  -0.080),
-  dist_x_clear  = c(5.182,   5.975),
-  dist_x_vis  = c(0.041,   0.119)
+  dist          = c(-0.181,   0.727),
+  clearance     = c( 0.336,   0.862),
+  vis           = c(-0.169,  -0.073),
+  dist_x_clear  = c(0.425,   0.953),
+  dist_x_vis  = c( 0.016,   0.098)
 )
 
 # --- Shared theme -------------------------------------------------------------
@@ -95,7 +95,7 @@ p1b <- ggplot(grid, aes(x = dist_sc, y = log_rss, colour = clearance_label)) +
     values = c("#D32F2F", "#FF8F00", "grey50", "#43A047", "#1565C0"),
     name = "Viewshed clearance"
   ) +
-  labs(x = "Distance to baboon (scaled)\n←Closer                     Farther →",
+  labs(x = "Distance (scaled)\n←Closer                     Farther →",
        y = "log-RSS (relative selection strength)"
   ) +
   theme_marginal() +
@@ -136,7 +136,7 @@ p_vis <- ggplot(grid_vis, aes(x = dist_sc, y = log_rss, colour = vis_label)) +
     name = "Horizontal visibility"
   ) +
   labs(
-    x = "Distance to baboon (scaled)\n\u2190 Closer                     Farther \u2192",
+    x = "Distance (scaled)\n\u2190 Closer                     Farther \u2192",
     y = "log-RSS (relative selection strength)"
   ) +
   theme_marginal() +
