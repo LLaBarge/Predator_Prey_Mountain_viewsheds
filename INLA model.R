@@ -31,7 +31,7 @@ ssf_complete$stratum_id   <- as.factor(ssf_complete$step_id_)
 ssf_complete$dist_x_vis <- ssf_complete$dist_scaled * ssf_complete$vis_scaled
 ssf_complete$dist_x_clear<- ssf_complete$dist_scaled * ssf_complete$clearance_scaled
 
-
+cor(x=ssf_complete$dist_scaled, y= ssf_complete$clearance_scaled)
 
 # =============================================================================
 # Fit INLA model
