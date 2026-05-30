@@ -2,6 +2,7 @@
 
 # Install packages
 library(sf)
+library(rlang)
 library(dplyr)
 library(lubridate)
 library(amt)
