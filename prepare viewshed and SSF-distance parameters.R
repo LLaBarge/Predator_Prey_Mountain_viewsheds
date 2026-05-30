@@ -6,7 +6,7 @@ library(raster)
 library(sf)
 
 # Load data and rasters
-dem <- raster("movement_analysis/dem.tif")
+dem <- raster("dem.tif")
 canopy_height_raster <- crop(raster("meta_tree_height.tif"), dem)
 cc_raster <- raster("canopy_cover.tif")
 vervet_clean <- readRDS("vervet_clean.rds")
@@ -35,7 +35,6 @@ if ("New_Timestamp" %in% names(vervet_clean)) {
 
 gps_dates <- unique(as.Date(vervet_clean$timestamp, tz = "UTC"))
 
-# =============================================================================
 # Load and parse scan data for observer height
 scans <- read.csv("scans_com.csv", stringsAsFactors = FALSE, quote = "\"")
 
@@ -119,7 +118,6 @@ scan_samples <- scans %>%
   filter(!is.na(max_height_m)) %>%
   arrange(datetime)
 
-# =============================================================================
 # Build SSF steps
 ver_track <- vervet_clean %>%
   make_track(longitude, latitude, timestamp, crs = 4326, all_cols = TRUE) %>%
@@ -138,7 +136,6 @@ ver_steps <- ver_track %>%
 
 ver_ssf_data <- ver_steps %>% random_steps(n_control = 10)
 
-# =============================================================================
 # Match observer heights from scan data
 strata_info <- ver_ssf_data %>%
   filter(case_ == TRUE) %>%
@@ -181,7 +178,6 @@ valid_strata <- strata_info %>%
 ver_ssf_data <- ver_ssf_data %>%
   filter(step_id_ %in% valid_strata)
 
-# =============================================================================
 # Pre-match baboon fixes with vervets
 bab_times_num <- as.numeric(baboon_clean$timestamp)
 step_times_num <- as.numeric(ver_ssf_data$t2_)
@@ -212,77 +208,106 @@ ver_ssf_data$dist_to_baboon <- sqrt(
 )
 ver_ssf_data$dist_to_baboon[!ver_ssf_data$bab_valid] <- NA
 
-# =============================================================================
-# Viewshed with canopy permeability
+# Sector viewshed with canopy permeability
+# 9 rays across a 45-degree cone centred on the bearing to the baboon group
+# prop_visible = fraction of rays with clearance >= 0 (primary metric)
+# Sights/sounds assumed mostly blocked beyond 1km .
 
-calculate_viewshed_clearance <- function(observer_x, observer_y, observer_height_agl,
-                                         target_x, target_y,
-                                         dem, canopy_height_raster, cc_raster,
-                                         target_height_agl = 1.5,
-                                         near_exclusion_m = 20) {
+calculate_sector_viewshed <- function(observer_x, observer_y, observer_height_agl,
+                                      target_x, target_y,
+                                      dem, canopy_height_raster, cc_raster,
+                                      target_height_agl = 1.5,
+                                      near_exclusion_m = 20,
+                                      sector_degrees = 45,
+                                      n_rays = 9) {
+  
+  na_result <- list(prop_visible = NA, max_clearance = NA,
+                    mean_clearance = NA, distance_m = NA)
   
   if (any(is.na(c(observer_x, observer_y, observer_height_agl, target_x, target_y)))) {
-    return(list(min_clearance = NA, distance_m = NA, n_obstructions = NA))
+    return(na_result)
+  }
+  
+  distance <- sqrt((target_x - observer_x)^2 + (target_y - observer_y)^2)
+  
+  if (is.na(distance) || distance < 1) {
+    return(list(prop_visible = 1, max_clearance = observer_height_agl,
+                mean_clearance = observer_height_agl, distance_m = distance))
   }
   
   obs_ground <- raster::extract(dem, matrix(c(observer_x, observer_y), ncol = 2))
-  tgt_ground <- raster::extract(dem, matrix(c(target_x, target_y), ncol = 2))
-  
-  if (is.na(obs_ground) || is.na(tgt_ground)) {
-    return(list(min_clearance = NA, distance_m = NA, n_obstructions = NA))
-  }
-  
+  if (is.na(obs_ground)) return(na_result)
   observer_elev <- obs_ground + observer_height_agl
-  target_elev   <- tgt_ground + target_height_agl
-  distance      <- sqrt((target_x - observer_x)^2 + (target_y - observer_y)^2)
   
-  if (is.na(distance) || distance < 1) {
-    return(list(min_clearance = observer_height_agl, distance_m = distance,
-                n_obstructions = 0))
+  dx <- target_x - observer_x
+  dy <- target_y - observer_y
+  central_bearing <- atan2(dx, dy)
+  
+  half_sector <- (sector_degrees / 2) * pi / 180
+  angles <- seq(-half_sector, half_sector, length.out = n_rays)
+  bearings <- central_bearing + angles
+  
+  ray_clearances <- numeric(n_rays)
+  
+  for (r in seq_along(bearings)) {
+    ray_x <- observer_x + distance * sin(bearings[r])
+    ray_y <- observer_y + distance * cos(bearings[r])
+    
+    ray_ground <- raster::extract(dem, matrix(c(ray_x, ray_y), ncol = 2))
+    if (is.na(ray_ground)) {
+      ray_clearances[r] <- NA
+      next
+    }
+    ray_elev <- ray_ground + target_height_agl
+    
+    n_points <- max(5, ceiling(distance / 50))
+    x_points <- seq(observer_x, ray_x, length.out = n_points)
+    y_points <- seq(observer_y, ray_y, length.out = n_points)
+    
+    terrain_elevs  <- raster::extract(dem, cbind(x_points, y_points))
+    canopy_heights <- raster::extract(canopy_height_raster, cbind(x_points, y_points))
+    canopy_covers  <- raster::extract(cc_raster, cbind(x_points, y_points))
+    
+    canopy_heights[is.na(canopy_heights)] <- 0
+    canopy_covers[is.na(canopy_covers)]   <- 0
+    
+    cover_fraction <- canopy_covers / 100
+    obstacle_elevs <- terrain_elevs + canopy_heights * cover_fraction
+    
+    fractions <- seq(0, 1, length.out = n_points)
+    los_elevs <- observer_elev + fractions * (ray_elev - observer_elev)
+    clearances <- los_elevs - obstacle_elevs
+    
+    point_distances <- fractions * distance
+    valid <- point_distances > near_exclusion_m &
+      point_distances < (distance - 5)
+    
+    if (sum(valid) == 0) {
+      ray_clearances[r] <- observer_height_agl
+    } else {
+      ray_clearances[r] <- min(clearances[valid], na.rm = TRUE)
+    }
   }
   
-  n_points <- max(5, ceiling(distance / 50))
-  x_points <- seq(observer_x, target_x, length.out = n_points)
-  y_points <- seq(observer_y, target_y, length.out = n_points)
+  valid_rays <- ray_clearances[!is.na(ray_clearances)]
+  if (length(valid_rays) == 0) return(na_result)
   
-  terrain_elevs  <- raster::extract(dem, cbind(x_points, y_points))
-  canopy_heights <- raster::extract(canopy_height_raster, cbind(x_points, y_points))
-  canopy_covers  <- raster::extract(cc_raster, cbind(x_points, y_points))
-  
-  canopy_heights[is.na(canopy_heights)] <- 0
-  canopy_covers[is.na(canopy_covers)]   <- 0
-  
-  cover_fraction <- canopy_covers / 100
-  obstacle_elevs <- terrain_elevs + canopy_heights * cover_fraction
-  
-  fractions <- seq(0, 1, length.out = n_points)
-  los_elevs <- observer_elev + fractions * (target_elev - observer_elev)
-  clearances <- los_elevs - obstacle_elevs
-  
-  point_distances <- fractions * distance
-  valid <- point_distances > near_exclusion_m &
-    point_distances < (distance - 5)
-  
-  if (sum(valid) == 0) {
-    return(list(min_clearance = observer_height_agl, distance_m = distance,
-                n_obstructions = 0))
-  }
-  
-  clearances_valid <- clearances[valid]
-  min_clearance  <- min(clearances_valid, na.rm = TRUE)
-  n_obstructions <- sum(clearances_valid < 0, na.rm = TRUE)
-  
-  return(list(min_clearance = min_clearance, distance_m = distance,
-              n_obstructions = n_obstructions))
+  return(list(
+    prop_visible   = sum(valid_rays >= 0) / length(valid_rays),
+    max_clearance  = max(valid_rays),
+    mean_clearance = mean(valid_rays),
+    distance_m     = distance
+  ))
 }
 
-# =============================================================================
-# Compute viewshed covariates
+# Compute sector viewshed covariates
+# Pairs within 1km get full sector calculation, >1km assumed fully blocked
 
 compute_idx <- which(ver_ssf_data$bab_valid)
 
-ver_ssf_data$viewshed_clearance_m <- NA
-ver_ssf_data$n_obstructions       <- NA
+ver_ssf_data$viewshed_prop_visible   <- NA
+ver_ssf_data$viewshed_max_clearance  <- NA
+ver_ssf_data$viewshed_mean_clearance <- NA
 
 start_time <- Sys.time()
 
@@ -291,19 +316,22 @@ for (k in seq_along(compute_idx)) {
   row <- ver_ssf_data[i, ]
   dist <- row$dist_to_baboon
   
-  # Skip distant pairs
-  if (!is.na(dist) && dist > 1500) {
-    ver_ssf_data$viewshed_clearance_m[i] <- -99
+  if (!is.na(dist) && dist > 1000) {
+    ver_ssf_data$viewshed_prop_visible[i]   <- 0
+    ver_ssf_data$viewshed_max_clearance[i]  <- -99
+    ver_ssf_data$viewshed_mean_clearance[i] <- -99
     next
   }
   
-  vs <- calculate_viewshed_clearance(
+  vs <- calculate_sector_viewshed(
     row$x2_, row$y2_, row$sentinel_height_m,
     row$baboon_x, row$baboon_y,
     dem, canopy_height_raster, cc_raster
   )
-  ver_ssf_data$viewshed_clearance_m[i] <- vs$min_clearance
-  ver_ssf_data$n_obstructions[i]       <- vs$n_obstructions
+  
+  ver_ssf_data$viewshed_prop_visible[i]   <- vs$prop_visible
+  ver_ssf_data$viewshed_max_clearance[i]  <- vs$max_clearance
+  ver_ssf_data$viewshed_mean_clearance[i] <- vs$mean_clearance
   
   if (k %% 2000 == 0) {
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
@@ -321,6 +349,8 @@ coords_matrix <- cbind(ver_ssf_data$x2_, ver_ssf_data$y2_)
 ver_ssf_data$horizontal_visibility_m <- raster::extract(hv_raster, coords_matrix)
 ver_ssf_data$canopy_cover_pct        <- raster::extract(cc_raster, coords_matrix)
 
-write.csv(ver_ssf_data, "ver_ssf_data_viewshed.csv", row.names = FALSE)
+# Primary viewshed metric: proportion of sector visible toward baboon
+ver_ssf_data$viewshed_clearance_m <- ver_ssf_data$viewshed_prop_visible
 
+write.csv(ver_ssf_data, "ver_ssf_data_viewshed_sector.csv", row.names = FALSE)
 
