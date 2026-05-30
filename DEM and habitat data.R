@@ -41,10 +41,10 @@ rm(dem_download, dem_wgs84)
 gc()
 
 # Save DEM for future use
-writeRaster(dem, "movement_analysis/dem.tif", overwrite = TRUE)
+writeRaster(dem, "dem.tif", overwrite = TRUE)
 
 
-plot(dem, main = "Lajuma and Surrounding Reserves Elevation (m)")
+plot(dem, main = "Elevation (m)")
 
 
 # Convert to sf objects 
@@ -121,8 +121,7 @@ calculate_topo_metrics <- function(ver_x, ver_y, bab_x, bab_y, dem) {
 }
 
 
-# Load DEM
-dem <- rast("movement_analysis/dem.tif")
+
 
 # Calculate for a single pair of locations
 metrics <- calculate_topo_metrics(ver_x = 750000, ver_y = 7449000, 
