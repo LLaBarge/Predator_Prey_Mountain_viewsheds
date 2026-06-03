@@ -7,7 +7,7 @@
 #   CT = chutter (snake/human alarm)
 #   RP = rraup (predator bird alarm)
 
-ALARM_WINDOW_MIN <- 30
+ALARM_WINDOW_MIN <- 15
 # Parse dates and times for ALL ad lib records (not just baboon obs)
 adlib$date_clean_all <- sapply(adlib[[date_col]], parse_date_gps_informed,
                                gps_dates_ref = gps_dates)
@@ -77,7 +77,7 @@ n_total <- nrow(encounter_results)
 n_alarm <- sum(encounter_results$alarm_present)
 n_silent <- n_total - n_alarm
 
-
+n_silent/n_total
 # Save updated encounter results
 encounter_results_final <- encounter_results
 write.csv(encounter_results_final, "encounter_behavioral_analysis_with_alarms.csv",
