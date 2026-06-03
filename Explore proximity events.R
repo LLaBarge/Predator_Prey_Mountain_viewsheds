@@ -6,7 +6,7 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 
-MAX_PROXIMITY_M <- 350
+MAX_PROXIMITY_M <- 400
 SCAN_SAMPLE_WINDOW_HOURS <- 1
 # data load
 
@@ -623,3 +623,4 @@ if (exists("fid") && nrow(fid) > 0) {
 saveRDS(proximity, "proximity.rds")
 saveRDS(encounter_summary, "encounter_summary.rds")
 saveRDS(encounter_results, "encounter_results.rds")
+
