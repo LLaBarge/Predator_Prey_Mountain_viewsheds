@@ -139,10 +139,10 @@ for (i in 1:nrow(encounters)) {
   encounters$observer_viewshed[i] <- viewshed_sector(
     obs_x = encounters$vervet_x[i],
     obs_y = encounters$vervet_y[i],
-    obs_h = 1.5,
+    obs_h = 1.7,
     tgt_x = encounters$baboon_x[i],
     tgt_y = encounters$baboon_y[i],
-    tgt_h = 1.5,
+    tgt_h = 1.7,
     dem, canopy_height_raster
   )
 }
@@ -186,12 +186,6 @@ priors_interaction <- c(
 )
 
 # Prior sensitivity analysis
-# Compare three prior specifications on the additive model (distance + viewshed)
-# to check that posteriors are driven by data, not prior choice.
-#
-# Informative:       as justified above
-# Weakly informative: same centres, doubled SDs
-# Diffuse:           centred at zero, wide SDs (minimal prior information)
 
 priors_weakly <- c(
   prior(normal(-1, 3),  class = "Intercept"),
@@ -366,7 +360,55 @@ encounters %>%
 p_ce <- plot(conditional_effects(m4), plot = FALSE)
 p_ce
 
+# Conditional effects plot for m4 (interaction model)
+# Predicted detection probability across distance at distinct viewshed levels
 
+library(tidybayes)
+
+# Create prediction grid
+dist_range <- seq(min(enc_complete$dist_sc), max(enc_complete$dist_sc), length.out = 200)
+viewshed_bins <- c(-1, 0, 1)
+
+pred_grid <- expand.grid(
+  dist_sc     = dist_range,
+  viewshed_sc = viewshed_bins
+)
+
+pred_grid$viewshed_label <- factor(
+  pred_grid$viewshed_sc,
+  levels = viewshed_bins,
+  labels = c("Blocked (-1 SD)", "Median viewshed", "Clear (+1 SD)")
+)
+
+fits <- fitted(m4, newdata = pred_grid, summary = TRUE)
+pred_grid$estimate <- fits[, "Estimate"]
+pred_grid$lower    <- fits[, "Q2.5"]
+pred_grid$upper    <- fits[, "Q97.5"]
+
+p_cond <- ggplot(pred_grid, aes(x = dist_sc, y = estimate, colour = viewshed_label,
+                                fill = viewshed_label)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.1, colour = NA) +
+  geom_line(linewidth = 1) +
+  scale_colour_manual(
+    values = c("#D32F2F", "grey50", "#1565C0"),
+    name = "Sector viewshed"
+  ) +
+  scale_fill_manual(
+    values = c("#D32F2F", "grey50", "#1565C0"),
+    name = "Sector viewshed"
+  ) +
+  labs(
+    x = "Distance (scaled)\n\u2190 Closer                     Farther \u2192",
+    y = "P(observer detected)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.position = "right"
+  )
+
+ggsave("observer_detection_conditional.png", p_cond, width = 9, height = 5.5, dpi = 300)
+p_cond
 # Save results
 write.csv(encounters[, c("encounter_id", "date", "detection_type", "detected",
                          "min_distance_m", "observer_viewshed",
