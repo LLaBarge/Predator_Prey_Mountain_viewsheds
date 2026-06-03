@@ -322,10 +322,8 @@ m4 <- brm(
 )
 
 # Results
-print("Model 1: distance only")
 print(summary(m1))
 
-print("Model 2: viewshed only")
 print(summary(m2))
 
 print("Model 3: distance + viewshed")
