@@ -151,7 +151,9 @@ cat("Overall detection rate:", sprintf("%.1f%%", overall_pct_detected), "\n\n")
 
 # Mean distance of observed vs missed
 mean_dist_observed <- mean(encounters$min_distance_m[encounters$detection_type == "explicit"])
+max_dist_observed <- max(encounters$min_distance_m[encounters$detection_type == "explicit"])
 mean_dist_missed <- mean(encounters$min_distance_m[encounters$detection_type == "implicit"])
 
 mean_dist_observed
 mean_dist_missed
+max_dist_observed
