@@ -1,4 +1,3 @@
-# create DAG for visualizing assumptions
 library(dagitty)
 library(ggdag)
 library(ggplot2)
@@ -19,7 +18,6 @@ dag <- dagitty('dag {
   BaboonPosition   -> ViewshedClearance
   VervetPosition   -> ViewshedClearance
   Terrain          -> ViewshedClearance
-  Terrain          -> LocalVisibility
   Vegetation       -> ViewshedClearance
   Vegetation       -> LocalVisibility
   Distance         -> Detection
@@ -30,7 +28,6 @@ dag <- dagitty('dag {
 
 dag_tidy <- tidy_dagitty(dag)
 
-#  labels
 dag_tidy$data$name_label <- dplyr::recode(dag_tidy$data$name,
                                           "BaboonPosition"    = "Baboon\nposition",
                                           "VervetPosition"    = "Vervet\nposition",
@@ -43,7 +40,6 @@ dag_tidy$data$name_label <- dplyr::recode(dag_tidy$data$name,
                                           "VervetMovement"    = "Vervet\nmovement"
 )
 
-# Colour by role
 dag_tidy$data$node_type <- dplyr::case_when(
   dag_tidy$data$name %in% c("BaboonPosition", "VervetPosition") ~ "Position",
   dag_tidy$data$name %in% c("Terrain", "Vegetation") ~ "Landscape",
@@ -70,6 +66,5 @@ p <- ggplot(dag_tidy, aes(x = x, y = y, xend = xend, yend = yend)) +
     legend.position = "bottom",
     legend.text = element_text(size = 10)
   )
-
 p
 ggsave("dag_clean.png", p, width = 11, height = 6, dpi = 300)
