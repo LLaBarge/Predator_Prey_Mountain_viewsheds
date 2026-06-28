@@ -1,0 +1,14 @@
+# get habitat data for visibility rasters
+
+var worldcover = ee.Image('ESA/WorldCover/v200/2021');
+var aoi = ee.Geometry.Rectangle([29.25, -23.10, 29.50, -23.00]);
+var clipped = worldcover.clip(aoi);
+
+Export.image.toDrive({
+  image: clipped,
+  description: 'worldcover_soutpansberg',
+  scale: 10,
+  region: aoi,
+  crs: 'EPSG:32735',
+  maxPixels: 1e9
+});
