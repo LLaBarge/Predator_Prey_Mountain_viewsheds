@@ -208,21 +208,28 @@ ver_ssf_data$dist_to_baboon <- sqrt(
 )
 ver_ssf_data$dist_to_baboon[!ver_ssf_data$bab_valid] <- NA
 
-# Sector viewshed with canopy permeability
-# 9 rays across a 45-degree cone centred on the bearing to the baboon group
-# prop_visible = fraction of rays with clearance >= 0 (primary metric)
-# Sights/sounds assumed mostly blocked beyond 1km .
+# =============================================================================
+# Sector sensoryshed: DEM + canopy height as solid obstacles
+#
+# The digital surface model (terrain + canopy) defines the obstacle surface
+# (Aben et al. 2018). Line-of-sight clearance is computed for each of 9 rays
+# across a 45-degree cone toward the baboon, sampled every 25m.
+#
+# The sensoryshed metric is the proportion of rays with clearance >= 0
+# (unobstructed line of sight), following the standard binary visible/not
+# convention in viewshed ecology. Bounded 0-1.
+# Pairs >1km score 0.
+# =============================================================================
 
-calculate_sector_viewshed <- function(observer_x, observer_y, observer_height_agl,
-                                      target_x, target_y,
-                                      dem, canopy_height_raster, cc_raster,
-                                      target_height_agl = 1.5,
-                                      near_exclusion_m = 20,
-                                      sector_degrees = 45,
-                                      n_rays = 9) {
+calculate_sector_sensoryshed <- function(observer_x, observer_y, observer_height_agl,
+                                         target_x, target_y,
+                                         dem, canopy_height_raster,
+                                         target_height_agl = 1.5,
+                                         near_exclusion_m = 20,
+                                         sector_degrees = 45,
+                                         n_rays = 9) {
   
-  na_result <- list(prop_visible = NA, max_clearance = NA,
-                    mean_clearance = NA, distance_m = NA)
+  na_result <- list(sensoryshed = NA, distance_m = NA)
   
   if (any(is.na(c(observer_x, observer_y, observer_height_agl, target_x, target_y)))) {
     return(na_result)
@@ -231,8 +238,7 @@ calculate_sector_viewshed <- function(observer_x, observer_y, observer_height_ag
   distance <- sqrt((target_x - observer_x)^2 + (target_y - observer_y)^2)
   
   if (is.na(distance) || distance < 1) {
-    return(list(prop_visible = 1, max_clearance = observer_height_agl,
-                mean_clearance = observer_height_agl, distance_m = distance))
+    return(list(sensoryshed = 1, distance_m = distance))
   }
   
   obs_ground <- raster::extract(dem, matrix(c(observer_x, observer_y), ncol = 2))
@@ -260,19 +266,16 @@ calculate_sector_viewshed <- function(observer_x, observer_y, observer_height_ag
     }
     ray_elev <- ray_ground + target_height_agl
     
-    n_points <- max(5, ceiling(distance / 50))
+    n_points <- max(5, ceiling(distance / 25))
     x_points <- seq(observer_x, ray_x, length.out = n_points)
     y_points <- seq(observer_y, ray_y, length.out = n_points)
     
     terrain_elevs  <- raster::extract(dem, cbind(x_points, y_points))
     canopy_heights <- raster::extract(canopy_height_raster, cbind(x_points, y_points))
-    canopy_covers  <- raster::extract(cc_raster, cbind(x_points, y_points))
-    
     canopy_heights[is.na(canopy_heights)] <- 0
-    canopy_covers[is.na(canopy_covers)]   <- 0
     
-    cover_fraction <- canopy_covers / 100
-    obstacle_elevs <- terrain_elevs + canopy_heights * cover_fraction
+    # Digital surface model: terrain + canopy as solid obstacles
+    obstacle_elevs <- terrain_elevs + canopy_heights
     
     fractions <- seq(0, 1, length.out = n_points)
     los_elevs <- observer_elev + fractions * (ray_elev - observer_elev)
@@ -293,21 +296,14 @@ calculate_sector_viewshed <- function(observer_x, observer_y, observer_height_ag
   if (length(valid_rays) == 0) return(na_result)
   
   return(list(
-    prop_visible   = sum(valid_rays >= 0) / length(valid_rays),
-    max_clearance  = max(valid_rays),
-    mean_clearance = mean(valid_rays),
-    distance_m     = distance
+    sensoryshed = sum(valid_rays >= 0) / length(valid_rays),
+    distance_m  = distance
   ))
 }
 
-# Compute sector viewshed covariates
-# Pairs within 1km get full sector calculation, >1km assumed fully blocked
-
+# Compute sensoryshed for all valid baboon-matched steps
 compute_idx <- which(ver_ssf_data$bab_valid)
-
-ver_ssf_data$viewshed_prop_visible   <- NA
-ver_ssf_data$viewshed_max_clearance  <- NA
-ver_ssf_data$viewshed_mean_clearance <- NA
+ver_ssf_data$sensoryshed <- NA
 
 start_time <- Sys.time()
 
@@ -317,21 +313,17 @@ for (k in seq_along(compute_idx)) {
   dist <- row$dist_to_baboon
   
   if (!is.na(dist) && dist > 1000) {
-    ver_ssf_data$viewshed_prop_visible[i]   <- 0
-    ver_ssf_data$viewshed_max_clearance[i]  <- -99
-    ver_ssf_data$viewshed_mean_clearance[i] <- -99
+    ver_ssf_data$sensoryshed[i] <- 0
     next
   }
   
-  vs <- calculate_sector_viewshed(
+  ss <- calculate_sector_sensoryshed(
     row$x2_, row$y2_, row$sentinel_height_m,
     row$baboon_x, row$baboon_y,
-    dem, canopy_height_raster, cc_raster
+    dem, canopy_height_raster
   )
   
-  ver_ssf_data$viewshed_prop_visible[i]   <- vs$prop_visible
-  ver_ssf_data$viewshed_max_clearance[i]  <- vs$max_clearance
-  ver_ssf_data$viewshed_mean_clearance[i] <- vs$mean_clearance
+  ver_ssf_data$sensoryshed[i] <- ss$sensoryshed
   
   if (k %% 2000 == 0) {
     elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
@@ -343,14 +335,13 @@ for (k in seq_along(compute_idx)) {
   }
 }
 
-# Extract horizontal visibility
-hv_raster <- raster("horizontal_visibility.tif")
-coords_matrix <- cbind(ver_ssf_data$x2_, ver_ssf_data$y2_)
-ver_ssf_data$horizontal_visibility_m <- raster::extract(hv_raster, coords_matrix)
-ver_ssf_data$canopy_cover_pct        <- raster::extract(cc_raster, coords_matrix)
+# Extract local habitat covariates at step endpoints
+hv_ground_raster <- raster("horizontal_visibility_ground.tif")
+hv_chest_raster  <- raster("horizontal_visibility_chest.tif")
 
-# Primary viewshed metric: proportion of sector visible toward baboon
-ver_ssf_data$viewshed_clearance_m <- ver_ssf_data$viewshed_prop_visible
+coords_matrix <- cbind(ver_ssf_data$x2_, ver_ssf_data$y2_)
+ver_ssf_data$hv_ground        <- raster::extract(hv_ground_raster, coords_matrix)
+ver_ssf_data$hv_chest         <- raster::extract(hv_chest_raster, coords_matrix)
+ver_ssf_data$canopy_cover_pct <- raster::extract(cc_raster, coords_matrix)
 
 write.csv(ver_ssf_data, "ver_ssf_data_viewshed_sector.csv", row.names = FALSE)
-
