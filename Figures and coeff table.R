@@ -2,22 +2,21 @@
 library(ggplot2)
 library(dplyr)
 
+
 # --- Model coefficients (from INLA output) -----------------------------------
 betas <- list(
-  dist          = 0.273,
-  clearance     = 0.599,
-  vis           =  -0.121,
-  dist_x_clear  = 0.689,
-  dist_x_vis  = 0.055
+  dist          = 0.053,
+  clearance     = 0.536,
+  vis           =  -0.017,
+  dist_x_clear  = 0.641
 )
 
 # 95% CIs
 cis <- list(
-  dist          = c(-0.181,   0.727),
-  clearance     = c( 0.336,   0.862),
-  vis           = c(-0.169,  -0.073),
-  dist_x_clear  = c(0.425,   0.953),
-  dist_x_vis  = c( 0.016,   0.098)
+  dist          = c(-0.381,   0.487),
+  clearance     = c( 0.330,   0.742),
+  vis           = c(-0.050,  0.017),
+  dist_x_clear  = c(0.419,   0.864)
 )
 
 # --- Shared theme -------------------------------------------------------------
@@ -103,70 +102,6 @@ p1b <- ggplot(grid, aes(x = dist_sc, y = log_rss, colour = clearance_label)) +
 p1a
 p1b
 
-
-
-
-
-#Marginal effect of horizontal visibility
-
-vis_bins <- c(-2, -1, 0, 1, 2)
-dist_levels <- seq(-2, 3, length.out = 200)
-
-grid_vis <- expand.grid(
-  dist_sc = dist_levels,
-  vis_sc = vis_bins
-)
-
-grid_vis$vis_label <- factor(
-  grid_vis$vis_sc,
-  levels = vis_bins,
-  labels = c("Very low visibility (-1.5 SD)", "Low visibility (-0.5 SD)",
-             "Mean visibility", "High visibility (+0.5 SD)", "Very high visibility (+1.5 SD)")
-)
-
-grid_vis$log_rss <- betas$dist * grid_vis$dist_sc +
-  betas$vis * grid_vis$vis_sc +
-  betas$dist_x_vis * grid_vis$dist_sc * grid_vis$vis_sc
-
-p_vis <- ggplot(grid_vis, aes(x = dist_sc, y = log_rss, colour = vis_label)) +
-  geom_line(linewidth = 1) +
-  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
-  scale_colour_manual(
-    values = c("#D32F2F", "#FF8F00", "grey50", "#43A047", "#1565C0"),
-    name = "Horizontal visibility"
-  ) +
-  labs(
-    x = "Distance (scaled)\n\u2190 Closer                     Farther \u2192",
-    y = "log-RSS (relative selection strength)"
-  ) +
-  theme_marginal() +
-  theme(legend.position = "right")
-
-p_vis
-vis_levels <- seq(-3, 3, length.out = 200)
-
-vis_df <- data.frame(
-  vis_sc  = vis_levels,
-  log_rss = betas$vis * vis_levels,
-  lower   = cis$vis[1] * vis_levels,
-  upper   = cis$vis[2] * vis_levels
-)
-
-vis_df$ci_low  <- pmin(vis_df$lower, vis_df$upper)
-vis_df$ci_high <- pmax(vis_df$lower, vis_df$upper)
-
-p3 <- ggplot(vis_df, aes(x = vis_sc)) +
-  geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.15, fill = "#00695C") +
-  geom_line(aes(y = log_rss), colour = "#00695C", linewidth = 1.2) +
-  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
-  geom_vline(xintercept = 0, linetype = "dotted", colour = "grey70") +
-  labs(
-    x = "Horizontal visibility (scaled)\n← Low visibility                    High visibility →",
-    y = "log-RSS"
-  ) +
-  theme_marginal()
-
-p3
 
 # Coefficient summary (forest plot)
 
