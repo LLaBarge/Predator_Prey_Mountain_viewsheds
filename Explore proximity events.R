@@ -6,7 +6,7 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 
-MAX_PROXIMITY_M <- 400
+MAX_PROXIMITY_M <- 300
 SCAN_SAMPLE_WINDOW_HOURS <- 1
 # data load
 
@@ -570,17 +570,8 @@ for (enc_id in encounter_ids) {
 
 
 
-# Height change
-n_height <- sum(!is.na(encounter_results$height_change_m))
-if (n_height > 0) {
-  cat("Height change from scan samples (n =", n_height, "):\n")
-  cat("  Mean:", sprintf("%.2f m", mean(encounter_results$height_change_m, na.rm=TRUE)), "\n")
-  cat("  Median:", sprintf("%.2f m", median(encounter_results$height_change_m, na.rm=TRUE)), "\n")
-  cat("  Increased:", sum(encounter_results$height_change_m > 0, na.rm=TRUE), "\n")
-  cat("  Decreased:", sum(encounter_results$height_change_m < 0, na.rm=TRUE), "\n\n")
-}
 
-# Movement
+# Movement away/towards
 n_move <- sum(!is.na(encounter_results$pct_movements_away))
 if (n_move > 0) {
   cat("Movement away (n =", n_move, "encounters):\n")
