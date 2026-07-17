@@ -6,15 +6,15 @@ library(dplyr)
 library(ggplot2)
 library(lubridate)
 
-MAX_PROXIMITY_M <- 300
+MAX_PROXIMITY_M <- 450
 SCAN_SAMPLE_WINDOW_HOURS <- 1
 # data load
 
 vervet_clean <- readRDS("vervet_clean.rds")
 baboon_clean <- readRDS("baboon_clean.rds")
 str(vervet_clean)
-cat("  Vervet fixes:", nrow(vervet_clean), "\n")
-cat("  Baboon fixes:", nrow(baboon_clean), "\n\n")
+cat("  Vervet fixes:", nrow(vervet_clean))
+cat("  Baboon fixes:", nrow(baboon_clean))
 
 # get column names
 find_col <- function(df, patterns) {
@@ -127,7 +127,7 @@ if (nrow(proximity) > 1) {
 }
 
 n_encounters <- length(unique(proximity$encounter_id))
-cat("  Unique encounters:", n_encounters, "\n\n")
+cat("  Unique encounters:", n_encounters)
 
 # summary stats for potential encounters
 encounter_summary <- proximity %>%
@@ -200,14 +200,14 @@ for (enc_id in unique(proximity$encounter_id)) {
 if (nrow(movement) == 0) {
   cat("No movement data available\n")} else {
     
-    bins <- seq(0, MAX_PROXIMITY_M, by = 100)
+    bins <- seq(0, MAX_PROXIMITY_M, by = 50)
     
     fid <- data.frame()
     
     for (i in 1:(length(bins)-1)) {
       
       in_bin <- movement %>%
-        filter(distance_to_baboon_m >= bins[i] & distance_to_baboon_m < bins[i+1])
+        filter(distance_to_baboon_m >= bins[i] & distance_to_baboon_m < bins[i+2])
       
       if (nrow(in_bin) > 0) {
         
@@ -215,7 +215,7 @@ if (nrow(movement) == 0) {
         pct_away <- 100 * n_away / nrow(in_bin)
         
         fid <- rbind(fid, data.frame(
-          distance_bin_mid = (bins[i] + bins[i+1]) / 2,
+          distance_bin_mid = (bins[i] + bins[i+2]) / 2,
           n_movements = nrow(in_bin),
           n_away = n_away,
           pct_away = pct_away
@@ -392,8 +392,8 @@ scans$time_clean <- sapply(scans[[scan_time_col]], parse_scan_time)
 scans$datetime <- as.POSIXct(paste(scans$date_clean, scans$time_clean), 
                              format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
 
-cat("  Scan observations:", nrow(scans), "\n")
-cat("  Valid datetimes:", sum(!is.na(scans$datetime)), "\n\n")
+cat("  Scan observations:", nrow(scans))
+cat("  Valid datetimes:", sum(!is.na(scans$datetime)))
 
 # Create scan samples
 scan_samples <- scans %>%
@@ -614,4 +614,3 @@ if (exists("fid") && nrow(fid) > 0) {
 saveRDS(proximity, "proximity.rds")
 saveRDS(encounter_summary, "encounter_summary.rds")
 saveRDS(encounter_results, "encounter_results.rds")
-
