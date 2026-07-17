@@ -1,7 +1,6 @@
 library(INLA)
 library(dplyr)
 
-# =============================================================================
 # Load and prepare data
 
 ver_ssf_data <- read.csv("ver_ssf_data_viewshed_sector.csv", stringsAsFactors = FALSE)
