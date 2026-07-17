@@ -2,6 +2,8 @@
 
 # check how many potential "missed" encounters there were
 
+
+
 library(dplyr)
 library(ggplot2)
 
@@ -17,7 +19,7 @@ cat("  Explicit (observed):", sum(encounters$detection_type == "explicit"), "\n"
 cat("  Implicit (not observed):", sum(encounters$detection_type == "implicit"), "\n\n")
 
 #analyse across distance thresholds
-distance_thresholds <- c(50, 100, 150, 200, 300, 500)
+distance_thresholds <- c(50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900)
 
 results_table <- data.frame()
 
@@ -46,33 +48,33 @@ for (threshold in distance_thresholds) {
   cat("  % Missed:", sprintf("%.1f%%", pct_missed), "\n\n")
 }
 
-# chose 200 as almost all encounters vervets respond to (by moving away/running)
-within_200m <- encounters %>% filter(min_distance_m <= 200)
+# chose 350 as most (52%) vervets respond to by moving away/running
+within_350m <- encounters %>% filter(min_distance_m <= 350)
 
-n_total_200 <- nrow(within_200m)
-n_observed_200 <- sum(within_200m$detection_type == "explicit")
-n_missed_200 <- sum(within_200m$detection_type == "implicit")
-pct_missed_200 <- if (n_total_200 > 0) 100 * n_missed_200 / n_total_200 else 0
+n_total_350 <- nrow(within_350m)
+n_observed_350 <- sum(within_500m$detection_type == "explicit")
+n_missed_350 <- sum(within_500m$detection_type == "implicit")
+pct_missed_350 <- if (n_total_350 > 0) 100 * n_missed_350 / n_total_350 else 0
 
-cat("Encounters within 200m:\n")
-cat("  Total:", n_total_200, "\n")
-cat("  Observed:", n_observed_200, "\n")
-cat("  Missed:", n_missed_200, "\n")
-cat("  % Missed:", sprintf("%.1f%%", pct_missed_200), "\n\n")
+# total number
+n_total_350
+n_observed_350
+n_missed_350
+cat("  % Missed:", sprintf("%.1f%%", pct_missed_350))
 
-if (n_missed_200 > 0) {
-  cat("Details of missed encounters (<200m):\n")
-  missed_200 <- within_200m %>% 
+if (n_missed_350 > 0) {
+  cat("Details of missed encounters (<350m)")
+  missed_350 <- within_350m %>% 
     filter(detection_type == "implicit") %>%
     arrange(min_distance_m)
   
-  cat("  Closest missed encounter:", round(min(missed_200$min_distance_m)), "m\n")
-  cat("  Median distance of missed:", round(median(missed_200$min_distance_m)), "m\n")
-  cat("  Mean distance of missed:", round(mean(missed_200$min_distance_m)), "m\n\n")
+  cat("  Closest missed encounter:", round(min(missed_350$min_distance_m)), "m\n")
+  cat("  Median distance of missed:", round(median(missed_350$min_distance_m)), "m\n")
+  cat("  Mean distance of missed:", round(mean(missed_350$min_distance_m)), "m\n\n")
   
   # Show first few
-  cat("First 10 missed encounters within 200m:\n")
-  print(missed_200[1:min(10, nrow(missed_200)), 
+  cat("First 10 missed encounters within 350m:")
+  print(missed_350[1:min(10, nrow(missed_350)), 
                    c("encounter_id", "date", "min_distance_m", "duration_min")])
 }
 
@@ -97,8 +99,8 @@ print(detection_by_distance)
 
 write.csv(results_table, "missed_encounters_by_distance.csv", row.names = FALSE)
 
-if (n_missed_200 > 0) {
-  write.csv(missed_200, "missed_encounters_within_150m.csv", row.names = FALSE)
+if (n_missed_350 > 0) {
+  write.csv(missed_350, "missed_encounters_within_350m.csv", row.names = FALSE)
 }
 
 
@@ -145,9 +147,8 @@ missed <- ggplot(results_table, aes(x = distance_threshold_m, y = pct_missed)) +
 ggsave("pct_missed_by_distance.png", missed, width = 8, height = 6, dpi = 300)
 missed
 
-# Overall detection rate w/in 500m
+# Overall detection rate w/in 350m
 overall_pct_detected <- 100 * sum(encounters$detection_type == "explicit") / nrow(encounters)
-cat("Overall detection rate:", sprintf("%.1f%%", overall_pct_detected), "\n\n")
 
 # Mean distance of observed vs missed
 mean_dist_observed <- mean(encounters$min_distance_m[encounters$detection_type == "explicit"])
@@ -157,3 +158,4 @@ mean_dist_missed <- mean(encounters$min_distance_m[encounters$detection_type == 
 mean_dist_observed
 mean_dist_missed
 max_dist_observed
+
