@@ -5,11 +5,11 @@ from qgis import processing
 from osgeo import gdal  # needed for Ubuntu 24
 
 # define the output
-output_file = os.path.expanduser("~/Soutpansberg_1m_Animal_DSM_Final.tif")
+output_file = os.path.expanduser("~/Soutpansberg_DSM_v2.tif")
 
 # match layer names
 dtm_name = "DTM_5m_Limpopo"
-chm_name = "meta_tree_height"
+chm_name = "meta_chmv2_studyarea"
 
 dtm_layer = QgsProject.instance().mapLayersByName(dtm_name)[0]
 chm_layer = QgsProject.instance().mapLayersByName(chm_name)[0]
@@ -65,5 +65,5 @@ chm_ds = None
 dtm_ds = None
 
 # add to map canvas
-final_dsm = QgsRasterLayer(output_file, "Soutpansberg_1m_Animal_DSM_Final")
+final_dsm = QgsRasterLayer(output_file, "Soutpansberg_DSM_v2")
 QgsProject.instance().addMapLayer(final_dsm)
